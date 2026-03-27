@@ -8,3 +8,36 @@ metadata:
 spec:
   city: Amsterdam
   country: NL
+---
+apiVersion: weather.io/v1alpha1
+kind: OpenWeatherReport
+metadata:
+  labels:
+    app.kubernetes.io/name: openweather-controller
+    app.kubernetes.io/managed-by: kustomize
+  name: ibiza
+spec:
+  city: Ibiza
+  country: ES
+---
+apiVersion: weather.io/v1alpha1
+kind: OpenWeatherReport
+metadata:
+  labels:
+    app.kubernetes.io/name: openweather-controller
+    app.kubernetes.io/managed-by: kustomize
+  name: new-york
+spec:
+  city: New York City
+  country: US
+---
+apiVersion: weather.io/v1alpha1
+kind: OpenWeatherReport
+metadata:
+  labels:
+    app.kubernetes.io/name: openweather-controller
+    app.kubernetes.io/managed-by: kustomize
+  name: does-not-exist
+spec:
+  city: Foo
+  country: XX

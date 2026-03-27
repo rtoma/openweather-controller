@@ -1,121 +1,210 @@
 # openweather-controller
-// TODO(user): Add simple overview of use/purpose
 
-## Description
-// TODO(user): An in-depth paragraph about your project and overview of use
+[![Build and Push Image](https://github.com/rtoma/openweather-controller/actions/workflows/image.yml/badge.svg)](https://github.com/rtoma/openweather-controller/actions/workflows/image.yml)
+[![Lint](https://github.com/rtoma/openweather-controller/actions/workflows/lint.yml/badge.svg)](https://github.com/rtoma/openweather-controller/actions/workflows/lint.yml)
+[![Tests](https://github.com/rtoma/openweather-controller/actions/workflows/test.yml/badge.svg)](https://github.com/rtoma/openweather-controller/actions/workflows/test.yml)
+[![E2E Tests](https://github.com/rtoma/openweather-controller/actions/workflows/test-e2e.yml/badge.svg)](https://github.com/rtoma/openweather-controller/actions/workflows/test-e2e.yml)
 
-## Getting Started
+A Kubernetes controller that watches `OpenWeatherReport` custom resources and periodically fetches weather data from the [OpenWeather API](https://openweathermap.org/api), writing results back to each resource's status.
+
+## How it works
+
+You declare which cities you want to monitor as cluster-scoped `OpenWeatherReport` resources. The controller continuously polls the OpenWeather API at a configurable interval and updates the resource status with current weather data — temperature, feels-like, humidity, and pressure.
+
+```
+kubectl get openweatherreport
+
+NAME        LOCATION            TEMPERATURE   FEELSLIKE   HUMIDITY   PRESSURE   STATUS   AGE
+amsterdam   Amsterdam, NL       14.2°C        13.1°C      72%        1015 hPa   Valid    2m
+new-york    New York City, US   22.5°C        21.8°C      55%        1012 hPa   Valid    2m
+```
+
+## Prerequisites
+
+- Kubernetes >= 1.31
+- `kubectl`
+- An [OpenWeather API key](https://openweathermap.org/appid) (free tier works)
+
+## Quick Start
+
+### 1. Create the API key Secret
+
+```sh
+kubectl create namespace openweather-controller-system
+
+kubectl create secret generic openweather-api-key \
+  --from-literal=api-key=<YOUR_OPENWEATHER_API_KEY> \
+  -n openweather-controller-system
+```
+
+### 2. Deploy the controller
+
+```sh
+kubectl apply -k https://github.com/rtoma/openweather-controller/config/default
+```
+
+This installs the CRD, RBAC, and the controller Deployment in the `openweather-controller-system` namespace.
+
+Verify the controller is running:
+
+```sh
+kubectl get pods -n openweather-controller-system
+```
+
+### 3. Create an OpenWeatherReport
+
+```yaml
+apiVersion: weather.io/v1alpha1
+kind: OpenWeatherReport
+metadata:
+  name: amsterdam
+spec:
+  city: Amsterdam
+  country: NL
+```
+
+```sh
+kubectl apply -f my-report.yaml
+```
+
+Within a few seconds the controller will fetch weather data and populate the status:
+
+```sh
+kubectl get openweatherreport amsterdam -o yaml
+```
+
+```yaml
+status:
+  location: "Amsterdam, NL"
+  temperature: "14.2°C"
+  feelsLike: "13.1°C"
+  humidity: "72%"
+  pressure: "1015 hPa"
+  status: Valid
+  lastUpdated: "2026-03-27T10:00:00Z"
+```
+
+## CRD Reference
+
+### OpenWeatherReport
+
+**API group/version:** `weather.io/v1alpha1`  
+**Scope:** Cluster-scoped (no namespace required)
+
+#### Spec
+
+| Field             | Type    | Required | Description |
+|-------------------|---------|----------|-------------|
+| `city`            | string  | yes      | City name (e.g. `Amsterdam`) |
+| `country`         | string  | yes      | ISO 3166-1 alpha-2 country code (e.g. `NL`) |
+| `intervalSeconds` | integer | no       | Poll interval in seconds. Minimum `5`, default `60` |
+
+#### Status
+
+| Field          | Type   | Description |
+|----------------|--------|-------------|
+| `temperature`  | string | Current temperature in Celsius |
+| `feelsLike`    | string | Feels-like temperature in Celsius |
+| `humidity`     | string | Relative humidity percentage |
+| `pressure`     | string | Atmospheric pressure in hPa |
+| `location`     | string | `"<city>, <country>"` — displayed by `kubectl get` |
+| `status`       | string | `Valid` or `Error` |
+| `errorMessage` | string | Populated when `status` is `Error`; empty otherwise |
+| `lastUpdated`  | string | RFC3339 timestamp of the last successful API call |
+
+### Example with all fields
+
+```yaml
+apiVersion: weather.io/v1alpha1
+kind: OpenWeatherReport
+metadata:
+  name: london
+spec:
+  city: London
+  country: GB
+  intervalSeconds: 120   # poll every 2 minutes instead of the default 60s
+```
+
+## Reconciliation behaviour
+
+- **New resources** are reconciled immediately.
+- **Existing resources** are requeued after `intervalSeconds` (default 60 s, minimum 5 s).
+- **Startup splay**: on controller restart a random 1–10 s delay is added per existing resource to avoid thundering-herd requests to the API.
+- **Transient API errors** (network issues, 5xx responses) trigger exponential backoff retries; status is set to `Error`.
+- **Permanent API errors** (city not found / HTTP 404) update the status to `Error` and stop retrying — fix the city/country in the spec to resume.
+
+## Development
 
 ### Prerequisites
-- go version v1.24.6+
-- docker version 17.03+.
-- kubectl version v1.11.3+.
-- Access to a Kubernetes v1.11.3+ cluster.
 
-### To Deploy on the cluster
-**Build and push your image to the location specified by `IMG`:**
+- Go >= 1.24
+- Docker (with buildx for multi-arch builds)
+- `make`
 
-```sh
-make docker-build docker-push IMG=<some-registry>/openweather-controller:tag
-```
-
-**NOTE:** This image ought to be published in the personal registry you specified.
-And it is required to have access to pull the image from the working environment.
-Make sure you have the proper permission to the registry if the above commands don’t work.
-
-**Install the CRDs into the cluster:**
+### Run locally against a cluster
 
 ```sh
+# Export your API key
+export OPENWEATHER_API_KEY=<your-key>
+
+# Install CRDs into the cluster pointed to by ~/.kube/config
 make install
+
+# Run the controller locally (uses your current kubeconfig)
+make run
 ```
 
-**Deploy the Manager to the cluster with the image specified by `IMG`:**
+### Build and push a custom image
 
 ```sh
-make deploy IMG=<some-registry>/openweather-controller:tag
+make docker-build docker-push IMG=<registry>/openweather-controller:<tag>
+make deploy IMG=<registry>/openweather-controller:<tag>
 ```
 
-> **NOTE**: If you encounter RBAC errors, you may need to grant yourself cluster-admin
-privileges or be logged in as admin.
-
-**Create instances of your solution**
-You can apply the samples (examples) from the config/sample:
+### Run tests
 
 ```sh
-kubectl apply -k config/samples/
+# Unit and integration tests
+make test
+
+# End-to-end tests (requires a running cluster)
+make test-e2e
 ```
 
->**NOTE**: Ensure that the samples has default values to test it out.
-
-### To Uninstall
-**Delete the instances (CRs) from the cluster:**
+### Other useful make targets
 
 ```sh
-kubectl delete -k config/samples/
+make help          # List all available targets
+make lint          # Run golangci-lint
+make manifests     # Regenerate CRD manifests
+make generate      # Regenerate DeepCopy methods
 ```
 
-**Delete the APIs(CRDs) from the cluster:**
+## Uninstall
 
 ```sh
+# Delete all OpenWeatherReport resources
+kubectl delete openweatherreports --all
+
+# Remove the controller and CRD
+make undeploy
 make uninstall
 ```
 
-**UnDeploy the controller from the cluster:**
+## Container image
 
-```sh
-make undeploy
+Pre-built multi-arch images (`linux/amd64`, `linux/arm64`) are published to GitHub Container Registry on every push to `main` and on version tags:
+
 ```
-
-## Project Distribution
-
-Following the options to release and provide this solution to the users.
-
-### By providing a bundle with all YAML files
-
-1. Build the installer for the image built and published in the registry:
-
-```sh
-make build-installer IMG=<some-registry>/openweather-controller:tag
+ghcr.io/rtoma/openweather-controller:main
+ghcr.io/rtoma/openweather-controller:v1.0.0
 ```
-
-**NOTE:** The makefile target mentioned above generates an 'install.yaml'
-file in the dist directory. This file contains all the resources built
-with Kustomize, which are necessary to install this project without its
-dependencies.
-
-2. Using the installer
-
-Users can just run 'kubectl apply -f <URL for YAML BUNDLE>' to install
-the project, i.e.:
-
-```sh
-kubectl apply -f https://raw.githubusercontent.com/<org>/openweather-controller/<tag or branch>/dist/install.yaml
-```
-
-### By providing a Helm Chart
-
-1. Build the chart using the optional helm plugin
-
-```sh
-kubebuilder edit --plugins=helm/v2-alpha
-```
-
-2. See that a chart was generated under 'dist/chart', and users
-can obtain this solution from there.
-
-**NOTE:** If you change the project, you need to update the Helm Chart
-using the same command above to sync the latest changes. Furthermore,
-if you create webhooks, you need to use the above command with
-the '--force' flag and manually ensure that any custom configuration
-previously added to 'dist/chart/values.yaml' or 'dist/chart/manager/manager.yaml'
-is manually re-applied afterwards.
 
 ## Contributing
-// TODO(user): Add detailed information on how you would like others to contribute to this project
 
-**NOTE:** Run `make help` for more information on all potential `make` targets
+Bug reports and pull requests are welcome. Please open an issue first to discuss significant changes.
 
-More information can be found via the [Kubebuilder Documentation](https://book.kubebuilder.io/introduction.html)
+Run `make help` for a full list of available make targets.
 
 ## License
 

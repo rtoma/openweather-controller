@@ -2,7 +2,6 @@ package controller
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -262,7 +261,7 @@ func TestReconcile_SuccessfulFetch_ClearsError(t *testing.T) {
 			Country: "NL",
 		},
 		Status: weatherv1alpha1.OpenWeatherReportStatus{
-			Status:       "Error",
+			Status:       statusError,
 			ErrorMessage: "previous failure",
 		},
 	}
@@ -318,7 +317,7 @@ func TestReconcile_FetchError(t *testing.T) {
 		WithStatusSubresource(report).
 		Build()
 	mock := &mockWeatherFetcher{
-		err: fmt.Errorf("API error: HTTP 401"),
+		err: &weather.APIError{StatusCode: 401, Message: "Invalid API key"},
 	}
 	r := &OpenWeatherReportReconciler{Client: cl, Scheme: scheme, Weather: mock}
 
@@ -334,11 +333,58 @@ func TestReconcile_FetchError(t *testing.T) {
 	if err := cl.Get(context.Background(), types.NamespacedName{Name: "amsterdam"}, &updated); err != nil {
 		t.Fatalf("failed to get updated CR: %v", err)
 	}
-	if updated.Status.Status != "Error" {
+	if updated.Status.Status != statusError {
 		t.Errorf("expected status Error, got %q", updated.Status.Status)
 	}
-	if updated.Status.ErrorMessage != "API error: HTTP 401" {
-		t.Errorf("expected errorMessage %q, got %q", "API error: HTTP 401", updated.Status.ErrorMessage)
+	if updated.Status.ErrorMessage != "API error (HTTP 401): Invalid API key" {
+		t.Errorf("expected errorMessage %q, got %q", "API error (HTTP 401): Invalid API key", updated.Status.ErrorMessage)
+	}
+}
+
+func TestReconcile_PermanentError_CityNotFound(t *testing.T) {
+	scheme := newTestScheme()
+	report := &weatherv1alpha1.OpenWeatherReport{
+		ObjectMeta: metav1.ObjectMeta{Name: "does-not-exist"},
+		Spec: weatherv1alpha1.OpenWeatherReportSpec{
+			City:    "Foo",
+			Country: "XX",
+		},
+		Status: weatherv1alpha1.OpenWeatherReportStatus{
+			Status: "Valid", // non-empty to skip splay
+		},
+	}
+	cl := fake.NewClientBuilder().
+		WithScheme(scheme).
+		WithObjects(report).
+		WithStatusSubresource(report).
+		Build()
+	mock := &mockWeatherFetcher{
+		err: &weather.APIError{StatusCode: 404, Message: "city not found"},
+	}
+	r := &OpenWeatherReportReconciler{Client: cl, Scheme: scheme, Weather: mock}
+
+	result, err := r.Reconcile(context.Background(), reconcile.Request{
+		NamespacedName: types.NamespacedName{Name: "does-not-exist"},
+	})
+
+	// Permanent error: should NOT return an error (no retry).
+	if err != nil {
+		t.Fatalf("expected no error for permanent API error, got %v", err)
+	}
+	// Should NOT requeue.
+	if result.RequeueAfter != 0 {
+		t.Fatalf("expected no requeue for permanent error, got %+v", result)
+	}
+
+	var updated weatherv1alpha1.OpenWeatherReport
+	if err := cl.Get(context.Background(), types.NamespacedName{Name: "does-not-exist"}, &updated); err != nil {
+		t.Fatalf("failed to get updated CR: %v", err)
+	}
+	if updated.Status.Status != statusError {
+		t.Errorf("expected status Error, got %q", updated.Status.Status)
+	}
+	if updated.Status.ErrorMessage != "API error (HTTP 404): city not found" {
+		t.Errorf("expected errorMessage %q, got %q", "API error (HTTP 404): city not found", updated.Status.ErrorMessage)
 	}
 }
 

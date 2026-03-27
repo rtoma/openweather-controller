@@ -35,6 +35,10 @@ resources:
 
 # Uncomment the patches line if you enable Metrics
 patches:
+# Inject the OpenWeather API key from a Secret into the manager container.
+- path: api_key_patch.yaml
+  target:
+    kind: Deployment
 # [METRICS] The following patch will enable the metrics endpoint using HTTPS and the port :8443.
 # More info: https://book.kubebuilder.io/reference/metrics
 - path: manager_metrics_patch.yaml

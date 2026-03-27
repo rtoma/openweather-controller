@@ -18,12 +18,13 @@ package controller
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand/v2"
 	"sync"
 	"time"
 
-	"k8s.io/apimachinery/pkg/api/errors"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -34,6 +35,7 @@ import (
 )
 
 const defaultIntervalSeconds = 60
+const statusError = "Error"
 
 // WeatherFetcher abstracts weather data retrieval for testability.
 type WeatherFetcher interface {
@@ -59,7 +61,7 @@ func (r *OpenWeatherReportReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	// Fetch the CR.
 	var report weatherv1alpha1.OpenWeatherReport
 	if err := r.Get(ctx, req.NamespacedName, &report); err != nil {
-		if errors.IsNotFound(err) {
+		if apierrors.IsNotFound(err) {
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, err
@@ -78,13 +80,21 @@ func (r *OpenWeatherReportReconciler) Reconcile(ctx context.Context, req ctrl.Re
 	// Call the weather API.
 	data, err := r.Weather.FetchWeather(ctx, report.Spec.City, report.Spec.Country)
 	if err != nil {
-		log.Error(err, "Failed to fetch weather data")
-		report.Status.Status = "Error"
+		report.Status.Status = statusError
 		report.Status.ErrorMessage = err.Error()
 		if updateErr := r.Status().Update(ctx, &report); updateErr != nil {
 			log.Error(updateErr, "Failed to update status after API error")
 			return ctrl.Result{}, updateErr
 		}
+
+		// Permanent errors (e.g. city not found) are terminal — don't retry.
+		var apiErr *weather.APIError
+		if errors.As(err, &apiErr) && apiErr.IsPermanent() {
+			log.Info("Permanent API error, will not retry", "error", err.Error())
+			return ctrl.Result{}, nil
+		}
+
+		log.Error(err, "Failed to fetch weather data")
 		// Exponential backoff is handled by controller-runtime when we return an error.
 		return ctrl.Result{}, err
 	}

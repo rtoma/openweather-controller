@@ -2,7 +2,7 @@
 
 ## Current Focus
 
-Splay bug fixed. Controller unit tests complete. Ready to write envtest integration tests or tackle remaining items (Dockerfile, CI, kustomize manifests, README).
+Permanent error handling implemented. Controller no longer retries terminal 404 errors. Ready to tackle remaining items: GitHub Actions CI, kustomize manifests, README.
 
 ## Recent Decisions
 
@@ -14,7 +14,7 @@ Splay bug fixed. Controller unit tests complete. Ready to write envtest integrat
 - Default poll interval 60s; per-CR override via `spec.intervalSeconds` (minimum 5s)
 - On API failure: exponential backoff requeue + set `status.status=Error` + `status.errorMessage`
 - Status includes `lastUpdated` (RFC3339 timestamp)
-- `kubectl get openweatherreport` shows: Location, Temperature, Humidity, Status, Age
+- `kubectl get openweatherreport` shows: Location, Temperature, FeelsLike, Humidity, Pressure, Status, Age
 - Location column = single `status.location` field set by controller
 - Kustomize for packaging; multi-arch image (`linux/amd64`, `linux/arm64`) on `ghcr.io/rtoma/openweather-controller`
 - Kubernetes target: >= 1.31
@@ -23,8 +23,8 @@ Splay bug fixed. Controller unit tests complete. Ready to write envtest integrat
 
 ## Next Steps (unsorted)
 
-- Write envtest integration tests for controller
+- ~~Write envtest integration tests for controller~~ Done
 - ~~Write Dockerfile (multi-stage, multi-arch)~~ Done
-- Write GitHub Actions workflow for image build + push to ghcr.io
-- Write kustomize manifests for deployment (ClusterRole, Deployment with OPENWEATHER_API_KEY env, CRD)
-- Write README with usage instructions
+- ~~Write kustomize manifests for deployment~~ Done
+- ~~Write GitHub Actions workflow for image build + push to ghcr.io~~ Done
+- ~~Write README with usage instructions~~ Done

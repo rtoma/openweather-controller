@@ -1,0 +1,10 @@
+# Adds the OPENWEATHER_API_KEY environment variable to the manager container.
+# The secret name includes the namePrefix applied by config/default/kustomization.yaml.
+- op: add
+  path: /spec/template/spec/containers/0/env
+  value:
+    - name: OPENWEATHER_API_KEY
+      valueFrom:
+        secretKeyRef:
+          name: openweather-controller-openweather-api-key
+          key: api-key

@@ -21,8 +21,14 @@ spec:
     - jsonPath: .status.temperature
       name: Temperature
       type: string
+    - jsonPath: .status.feelsLike
+      name: FeelsLike
+      type: string
     - jsonPath: .status.humidity
       name: Humidity
+      type: string
+    - jsonPath: .status.pressure
+      name: Pressure
       type: string
     - jsonPath: .status.status
       name: Status

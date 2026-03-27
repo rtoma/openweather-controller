@@ -4,6 +4,89 @@ This file contains a log of everything we have done so far. It serves as a cold 
 
 # Journal
 
+## 2026-03-27 17:04
+
+Fixed `make lint` issues (0 issues now):
+- `goconst`: Added `const statusError = "Error"` in `openweatherreport_controller.go`; replaced all 6 string literals across controller and test files.
+- `staticcheck`: Removed deprecated `result.Requeue` from `reconcile_unit_test.go:375`, keeping only `result.RequeueAfter != 0`.
+
+## 2026-03-27 17:00
+
+Rewrote README.md from the kubebuilder scaffold stub to a publish-ready GitHub README. New content includes: CI badge row, project description, `kubectl get` output example, Quick Start (Secret → deploy → create resource), CRD spec/status reference tables, full-field YAML example, reconciliation behaviour notes, development guide (local run, custom image build, test commands, make targets), uninstall steps, container image tags, and contributing/license sections. All TODO stubs removed.
+
+## 2026-03-27 16:55
+
+Added `FeelsLike` and `Pressure` as `+kubebuilder:printcolumn` markers in `api/v1alpha1/openweatherreport_types.go`:
+- `FeelsLike` inserted immediately after `Temperature`
+- `Pressure` inserted immediately after `Humidity`
+- Column order is now: Location, Temperature, FeelsLike, Humidity, Pressure, Status, Age
+- `make manifests` needs to be run to regenerate the CRD YAML
+
+## 2026-03-27 16:52
+
+Created `.github/workflows/image.yml` — GitHub Actions workflow for building and pushing the Docker image to ghcr.io:
+- Triggers on push to `main`, version tags (`v*`), and PRs to `main`
+- Sets up QEMU + Docker Buildx for multi-arch builds (`linux/amd64`, `linux/arm64`)
+- Logs in to ghcr.io using `GITHUB_TOKEN` (skip on PRs)
+- Uses `docker/metadata-action` to generate tags: branch name, semver (`v1.2.3`, `1.2`), and short SHA
+- Uses GHA layer cache (`type=gha`) for fast rebuilds
+- Skips push on pull_request events (build-only validation)
+
+## 2026-03-27 16:51
+
+Written kustomize manifests for deployment:
+- Created `config/manager/api-key-secret.yaml` — Secret template with placeholder value; comments explain how to replace or use `kubectl create secret` instead.
+- Updated `config/manager/kustomization.yaml` — added `api-key-secret.yaml` to resources.
+- Created `config/default/api_key_patch.yaml` — JSON-patch Deployment to inject `OPENWEATHER_API_KEY` env var from the Secret (uses full prefixed name `openweather-controller-openweather-api-key` to match kustomize's namePrefix).
+- Updated `config/default/kustomization.yaml` — added `api_key_patch.yaml` to patches (listed first, before metrics patch).
+- Verified `bin/kustomize build config/default` produces valid YAML with correct Secret name and env var in Deployment.
+
+## 2026-03-27 16:42
+
+Implemented permanent error handling for terminal API errors (e.g. HTTP 404 city not found):
+- Added `APIError` struct to `internal/weather/client.go` with `StatusCode`, `Message`, `IsPermanent()` method.
+- Weather client now returns `*APIError` for HTTP errors instead of plain `fmt.Errorf` strings.
+- Controller checks `errors.As(err, &apiErr) && apiErr.IsPermanent()` — if true, logs info (not error), updates status to Error, and returns `ctrl.Result{}, nil` (no requeue, no retry).
+- Transient errors (e.g. 401, 500) still trigger exponential backoff via controller-runtime as before.
+- Added `TestReconcile_PermanentError_CityNotFound` unit test. Updated existing `TestReconcile_FetchError` to use `*weather.APIError`.
+- All tests pass (unit + envtest).
+
+## 2026-03-27 16:25
+
+Wrote comprehensive envtest integration tests with a running controller manager.
+
+**Changes:**
+- `internal/controller/suite_test.go`: Rewrote to start a real controller manager with a `configurableFetcher` (thread-safe, configurable mock). Disabled metrics server in tests. Manager runs in background goroutine via `mgr.Start(ctx)`.
+- `internal/controller/openweatherreport_controller_test.go`: Replaced the single manual-reconcile test with 7 `Eventually`-based integration test scenarios:
+  1. Happy path — CR created → status Valid with all weather fields populated
+  2. Correct city/country passed to weather API
+  3. API error → status Error with errorMessage
+  4. Error recovery — API fails then succeeds → Error → Valid, errorMessage cleared
+  5. Custom intervalSeconds — works correctly, re-reconciles at 5s interval
+  6. CR deletion — handled gracefully, CR removed from cluster
+  7. Multiple CRs — both reconciled independently
+
+**Results:** All 7 envtest integration tests + all 10 unit tests pass (13.9s total).
+
+## 2026-03-27 16:13
+
+Fixed `make test` failure — the envtest integration test (`openweatherreport_controller_test.go`) was failing because:
+- CR was created without required `spec.city` and `spec.country` fields (CRD validation rejected it)
+- CR had `Namespace: "default"` but the CRD is cluster-scoped
+- Reconciler was missing the `Weather` (WeatherFetcher) dependency
+
+Fixed by: populating spec fields (Amsterdam, NL), removing namespace, adding a `fakeWeatherFetcher`, and adding status assertions. All tests now pass (84.2% controller coverage, 91.7% weather client coverage).
+
+## 2026-03-27 16:10
+
+Fixed all 8 golangci-lint issues (`make lint` now passes with 0 issues):
+- `errcheck`: wrapped `resp.Body.Close()` in defer closure with `_ =` in `internal/weather/client.go`
+- `errcheck`: added `_ =` to 3 `json.NewEncoder().Encode()` calls and 2 `w.Write()` calls in `internal/weather/client_test.go`
+- `staticcheck` QF1008: removed embedded field `NamespacedName` from selector in `internal/controller/openweatherreport_controller.go` (used `req.String()` instead of `req.NamespacedName.String()`)
+- `staticcheck` SA1019: removed deprecated `result.Requeue` check in `internal/controller/reconcile_unit_test.go`
+
+Note: envtest integration test (`TestControllers`) has a pre-existing failure — CR created without required `city`/`country` fields.
+
 ## 2026-03-27 15:59
 
 Dockerfile completed (multi-stage, multi-arch ready):

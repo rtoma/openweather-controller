@@ -91,7 +91,9 @@ Shown by `kubectl get openweatherreport`:
 - Read from env var `OPENWEATHER_API_KEY` at startup; fatal if missing.
 
 ### Error handling
-- API errors → `status.status = "Error"`, `status.errorMessage = <error string>`, requeue with backoff.
+- API errors → `status.status = "Error"`, `status.errorMessage = <error string>`.
+- **Permanent errors** (HTTP 404 city not found) → status updated, no requeue, no retry. Uses `weather.APIError.IsPermanent()`.
+- **Transient errors** (other HTTP codes, network errors) → requeue with exponential backoff (controller-runtime).
 - Status update failures → return error (controller-runtime will requeue).
 
 ## OpenWeather API

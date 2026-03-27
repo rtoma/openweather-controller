@@ -20,6 +20,25 @@ type WeatherData struct {
 	Pressure    int
 }
 
+// APIError represents an error response from the OpenWeather API.
+type APIError struct {
+	StatusCode int
+	Message    string
+}
+
+func (e *APIError) Error() string {
+	if e.Message != "" {
+		return fmt.Sprintf("API error (HTTP %d): %s", e.StatusCode, e.Message)
+	}
+	return fmt.Sprintf("API error: HTTP %d", e.StatusCode)
+}
+
+// IsPermanent returns true if this API error represents a terminal state
+// that will not resolve by retrying (e.g. city not found).
+func (e *APIError) IsPermanent() bool {
+	return e.StatusCode == http.StatusNotFound
+}
+
 // apiResponse mirrors the relevant parts of the OpenWeather API JSON response.
 type apiResponse struct {
 	Main struct {
@@ -97,11 +116,12 @@ func (c *Client) FetchWeather(ctx context.Context, city, country string) (*Weath
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		var apiErr apiResponse
-		if json.Unmarshal(body, &apiErr) == nil && apiErr.Message != "" {
-			return nil, fmt.Errorf("API error (HTTP %d): %s", resp.StatusCode, apiErr.Message)
+		apiErr := &APIError{StatusCode: resp.StatusCode}
+		var parsed apiResponse
+		if json.Unmarshal(body, &parsed) == nil && parsed.Message != "" {
+			apiErr.Message = parsed.Message
 		}
-		return nil, fmt.Errorf("API error: HTTP %d", resp.StatusCode)
+		return nil, apiErr
 	}
 
 	var data apiResponse

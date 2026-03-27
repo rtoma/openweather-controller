@@ -70,7 +70,9 @@ type OpenWeatherReportStatus struct {
 // +kubebuilder:resource:scope=Cluster
 // +kubebuilder:printcolumn:name="Location",type=string,JSONPath=`.status.location`
 // +kubebuilder:printcolumn:name="Temperature",type=string,JSONPath=`.status.temperature`
+// +kubebuilder:printcolumn:name="FeelsLike",type=string,JSONPath=`.status.feelsLike`
 // +kubebuilder:printcolumn:name="Humidity",type=string,JSONPath=`.status.humidity`
+// +kubebuilder:printcolumn:name="Pressure",type=string,JSONPath=`.status.pressure`
 // +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.status`
 // +kubebuilder:printcolumn:name="Age",type=date,JSONPath=`.status.lastUpdated`
 
