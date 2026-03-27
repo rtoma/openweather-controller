@@ -1,0 +1,4 @@
+## Append samples of your project ##
+resources:
+- weather_v1alpha1_openweatherreport.yaml
+# +kubebuilder:scaffold:manifestskustomizesamples

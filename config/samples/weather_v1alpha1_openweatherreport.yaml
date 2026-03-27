@@ -1,0 +1,10 @@
+apiVersion: weather.io/v1alpha1
+kind: OpenWeatherReport
+metadata:
+  labels:
+    app.kubernetes.io/name: openweather-controller
+    app.kubernetes.io/managed-by: kustomize
+  name: openweatherreport-sample
+spec:
+  city: Amsterdam
+  country: NL
