@@ -4,6 +4,12 @@ This file contains a log of everything we have done so far. It serves as a cold 
 
 # Journal
 
+## 2026-03-27 17:09
+
+Fixed "build and push image" workflow Docker Hub rate limit error:
+- `docker/setup-qemu-action` was pulling `tonistiigi/binfmt:latest` from Docker Hub
+- Added `image: ghcr.io/tonistiigi/binfmt:latest` override to pull from GHCR instead
+
 ## 2026-03-27 17:04
 
 Fixed `make lint` issues (0 issues now):
