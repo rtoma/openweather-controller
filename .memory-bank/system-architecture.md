@@ -67,13 +67,13 @@ type OpenWeatherReportStatus struct {
 
 ### additionalPrinterColumns
 Shown by `kubectl get openweatherreport`:
-- **Location**: `"{.spec.city}, {.spec.country}"` — requires custom formatting (see note below)
+- **Location**: `.status.location` (set by controller as `"<city>, <country>"`)
 - **Temperature**: `.status.temperature`
+- **FeelsLike**: `.status.feelsLike`
 - **Humidity**: `.status.humidity`
+- **Pressure**: `.status.pressure`
 - **Status**: `.status.status`
 - **Age**: `.status.lastUpdated` (type `date`)
-
-> Note: `additionalPrinterColumns` does not support multi-field JSONPath. Use a single `location` status field that is set by the controller as `"<city>, <country>"`, or use two separate columns (City, Country).
 
 ## Key Patterns
 

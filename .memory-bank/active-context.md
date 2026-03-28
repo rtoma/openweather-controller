@@ -19,7 +19,7 @@ Permanent error handling implemented. Controller no longer retries terminal 404 
 - Kustomize for packaging; multi-arch image (`linux/amd64`, `linux/arm64`) on `ghcr.io/rtoma/openweather-controller`
 - Kubernetes target: >= 1.31
 - Tests: envtest + kind
-- Startup splay: 1–10s random delay per CR on first reconcile to avoid thundering herd
+- Startup splay: 1–10s random delay per existing CR on first reconcile to avoid thundering herd; new CRs reconcile immediately
 
 ## Next Steps (unsorted)
 

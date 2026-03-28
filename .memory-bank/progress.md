@@ -4,6 +4,12 @@ This file contains a log of everything we have done so far. It serves as a cold 
 
 # Journal
 
+## 2026-03-28 16:43
+
+Fixed outdated printcolumn documentation in two memory-bank files:
+- `product-context.md`: Added missing **FeelsLike** and **Pressure** columns to the kubectl get description.
+- `system-architecture.md`: Added missing **FeelsLike** and **Pressure** columns; corrected Location JSONPath from `{.spec.city}, {.spec.country}` to `.status.location`.
+
 ## 2026-03-27 17:09
 
 Fixed "build and push image" workflow Docker Hub rate limit error:

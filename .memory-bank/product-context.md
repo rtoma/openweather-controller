@@ -36,13 +36,13 @@ Scope: **cluster-scoped** (not namespaced).
 
 ### kubectl get columns (additionalPrinterColumns)
 
-`kubectl get openweatherreport` shows: **Location** (city+country), **Temperature**, **Humidity**, **Status**, **Age** (based on `lastUpdated`).
+`kubectl get openweatherreport` shows: **Location** (city+country), **Temperature**, **FeelsLike**, **Humidity**, **Pressure**, **Status**, **Age** (based on `lastUpdated`).
 
 ## Reconciliation behaviour
 
 - **New CR**: reconcile immediately.
 - **Existing CR**: requeue after `intervalSeconds` (default 60s, minimum 5s).
-- **Startup splay**: one-time random delay of 1–10 seconds added per CR at controller start to avoid thundering herd.
+- **Startup splay**: one-time random delay of 1–10 seconds added per existing CR at controller start to avoid thundering herd. New CRs are reconciled immediately.
 - **API failure**: retry with exponential backoff; set `status.status=Error` and populate `status.errorMessage`.
 
 ## Deployment
