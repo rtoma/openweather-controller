@@ -7,7 +7,7 @@
 
 A Kubernetes controller that watches `OpenWeatherReport` custom resources and periodically fetches weather data from the [OpenWeather API](https://openweathermap.org/api), writing results back to each resource's status.
 
-Note: this project is using the [AI agent Memory Bank Protocol](https://github.com/rtoma/agent-markdown-memory-bank-protocol).
+Note: this project is using my [AI agent Memory Bank Protocol](https://github.com/rtoma/agent-markdown-memory-bank-protocol).
 
 ## How it works
 
