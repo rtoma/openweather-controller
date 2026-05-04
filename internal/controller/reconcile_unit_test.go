@@ -37,7 +37,7 @@ func newTestScheme() *runtime.Scheme {
 	return s
 }
 
-func intPtr(v int) *int { return &v }
+func ptr[T any](v T) *T { return &v }
 
 func TestReconcile_CRNotFound(t *testing.T) {
 	scheme := newTestScheme()
@@ -395,7 +395,7 @@ func TestReconcile_CustomInterval(t *testing.T) {
 		Spec: weatherv1alpha1.OpenWeatherReportSpec{
 			City:            "Amsterdam",
 			Country:         "NL",
-			IntervalSeconds: intPtr(120),
+			IntervalSeconds: ptr(120),
 		},
 		Status: weatherv1alpha1.OpenWeatherReportStatus{
 			Status: "Valid",
@@ -471,12 +471,12 @@ func TestEffectiveInterval(t *testing.T) {
 		expected time.Duration
 	}{
 		{"nil defaults to 60s", nil, 60 * time.Second},
-		{"5s minimum", intPtr(5), 5 * time.Second},
-		{"custom 30s", intPtr(30), 30 * time.Second},
-		{"below minimum falls back to 60s", intPtr(4), 60 * time.Second},
-		{"zero falls back to 60s", intPtr(0), 60 * time.Second},
-		{"negative falls back to 60s", intPtr(-1), 60 * time.Second},
-		{"large value accepted", intPtr(3600), 3600 * time.Second},
+		{"5s minimum", ptr(5), 5 * time.Second},
+		{"custom 30s", ptr(30), 30 * time.Second},
+		{"below minimum falls back to 60s", ptr(4), 60 * time.Second},
+		{"zero falls back to 60s", ptr(0), 60 * time.Second},
+		{"negative falls back to 60s", ptr(-1), 60 * time.Second},
+		{"large value accepted", ptr(3600), 3600 * time.Second},
 	}
 
 	for _, tt := range tests {
